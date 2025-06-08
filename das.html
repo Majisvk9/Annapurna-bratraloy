@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inventory Ace - Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #ecf0f1;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #3498db;
+      color: white;
+      padding: 1rem 2rem;
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    main {
+      padding: 2rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .stats {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      flex: 1 1 30%;
+      background: white;
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .stat-card h3 {
+      margin: 0 0 0.5rem;
+      color: #3498db;
+      font-weight: normal;
+      font-size: 1.2rem;
+    }
+    .stat-card p {
+      font-size: 1.8rem;
+      margin: 0;
+      font-weight: bold;
+    }
+    section {
+      background: white;
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+    h2 {
+      margin-top: 0;
+      color: #2ecc71;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    th {
+      background: #3498db;
+      color: white;
+    }
+    .low-stock {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <header>Inventory Ace Dashboard</header>
+  <main>
+    <div class="stats">
+      <div class="stat-card">
+        <h3>Today's Net Sales</h3>
+        <p id="todaySales">$0</p>
+      </div>
+      <div class="stat-card">
+        <h3>This Month's Net Sales</h3>
+        <p id="monthSales">$0</p>
+      </div>
+      <div class="stat-card">
+        <h3>Total Net Revenue</h3>
+        <p id="totalRevenue">$0</p>
+      </div>
+    </div>
+
+    <section>
+      <h2>Top Product Stock Levels</h2>
+      <canvas id="stockChart" width="800" height="300"></canvas>
+    </section>
+
+    <section>
+      <h2>Low Stock Products (Less than 10)</h2>
+      <table id="lowStockTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Brand</th>
+            <th>Size</th>
+            <th>Stock</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="4">Loading...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    async function fetchDashboardData() {
+      try {
+        // You need to implement these API endpoints on your backend
+        const [salesRes, productsRes] = await Promise.all([
+          fetch('/api/dashboard/sales', { credentials: 'include' }),
+          fetch('/api/dashboard/products', { credentials: 'include' }),
+        ]);
+
+        if (!salesRes.ok || !productsRes.ok) {
+          throw new Error('Failed to fetch dashboard data');
+        }
+
+        const salesData = await salesRes.json();
+        const productsData = await productsRes.json();
+
+        document.getElementById('todaySales').textContent = `$${salesData.todayNetSales.toFixed(2)}`;
+        document.getElementById('monthSales').textContent = `$${salesData.monthNetSales.toFixed(2)}`;
+        document.getElementById('totalRevenue').textContent = `$${salesData.totalNetRevenue.toFixed(2)}`;
+
+        // Render product stock chart
+        const ctx = document.getElementById('stockChart').getContext('2d');
+        const labels = productsData.topProducts.map(p => p.name);
+        const stocks = productsData.topProducts.map(p => p.stockQuantity);
+
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Stock Quantity',
+              data: stocks,
+              backgroundColor: 'rgba(52, 152, 219, 0.7)',
+            }],
+          },
+          options: {
+            scales: {
+              y: { beginAtZero: true }
+            }
+          }
+        });
+
+        // Populate low stock table
+        const lowStockTableBody = document.querySelector('#lowStockTable tbody');
+        lowStockTableBody.innerHTML = '';
+        if (productsData.lowStockProducts.length === 0) {
+          lowStockTableBody.innerHTML = '<tr><td colspan="4">No low stock products.</td></tr>';
+        } else {
+          for (const prod of productsData.lowStockProducts) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${prod.name}</td>
+              <td>${prod.brandName || '-'}</td>
+              <td>${prod.size}</td>
+              <td class="low-stock">${prod.stockQuantity}</td>
+            `;
+            lowStockTableBody.appendChild(tr);
+          }
+        }
+      } catch (err) {
+        alert('Failed to load dashboard data: ' + err.message);
+      }
+    }
+
+    fetchDashboardData();
+  </script>
+</body>
+</html>
